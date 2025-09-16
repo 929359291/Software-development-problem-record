@@ -1,7 +1,7 @@
 1. 使用Ambari平台,核心组件版本：yarn-3.1.0、hdfs-3.1.0, 通过dinky或streampark实时开发平台提交任务后出现的问题及解决办法:
   1.1 在yarn资源池中显示等待分配资源YarnApplicationState:	ACCEPTED: waiting for AM container to be allocated, launched and register with RM
   1.2 最初几个月出现这个问题都是通过重启yarn组件才能解决，但是过几天又会在分配资源卡住，参考1.1现象。在yarn资源池的内存、cpu是充足的，已使用率只有10%左右
-  1.3 研究后设置了一些yarn参数解决了，重要的是前面几个
+  1.3 研究后设置了一些yarn参数解决了，重要的是前面几个，https://www.cnblogs.com/w-j-q/p/14956922.html
 
 
 yarn.scheduler.capacity.root.default.maximum-am-resource-percent=0.99
