@@ -1,5 +1,5 @@
 1. 使用dinky_1.2.4版本，Ambari平台,核心组件版本：yarn-3.1.0、hdfs-3.1.0，flink版本1.19.1，实时开发平台提交作业后checkpoint提示失败
-  1.1 jobmanger显示错误日志guava包Platform类缺失方法
+  1.1 jobmanger.log显示错误日志guava包Platform类缺失方法
   1.2 研究发现是dinky_1.2.4自带的依赖包dinky-app-1.19-1.2.4-jar-with-dependencies.jar使用的guava包版本过高，而Ambari的大数据包使用的guava版本比较低
   1.3 flink运行时读取了Ambari大数据环境的依赖包，里面使用了Platform类，但是读取的guava包版本来自dinky，不是原本需要的guava版本
   1.4 找到dinky github仓库，根据官网的操作指引排除guava包后，重新编译打包dinky-app-1.19-1.2.4-jar-with-dependencies.jar，再放到dinky平台的依赖路径上
