@@ -1,0 +1,27 @@
+1. 使用Ambari平台,核心组件版本：yarn-3.1.0、hdfs-3.1.0, 通过dinky或streampark实时开发平台提交任务后出现的问题及解决办法:
+  1.1 在yarn资源池中显示等待分配资源YarnApplicationState:	ACCEPTED: waiting for AM container to be allocated, launched and register with RM
+  1.2 最初几个月出现这个问题都是通过重启yarn组件才能解决，但是过几天又会在分配资源卡住，参考1.1现象。在yarn资源池的内存、cpu是充足的，已使用率只有10%左右
+  1.3 研究后设置了一些yarn参数解决了，重要的是前面几个
+
+
+yarn.scheduler.capacity.root.default.maximum-am-resource-percent=0.99
+yarn.scheduler.capacity.ordering-policy.fair.enable-size-based-weight=true
+yarn.scheduler.capacity.root.default.user-limit-factor=100
+yarn.scheduler.capacity.root.default.priority=99
+yarn.scheduler.capacity.maximum-am-resource-percent=1
+yarn.scheduler.capacity.maximum-applications=100000
+yarn.scheduler.capacity.node-locality-delay=40
+yarn.scheduler.capacity.queue-mappings-override.enable=false
+yarn.scheduler.capacity.resource-calculator=org.apache.hadoop.yarn.util.resource.DefaultResourceCalculator
+yarn.scheduler.capacity.root.accessible-node-labels=*
+yarn.scheduler.capacity.root.acl_administer_queue=*
+yarn.scheduler.capacity.root.acl_submit_applications=*
+yarn.scheduler.capacity.root.capacity=100
+yarn.scheduler.capacity.root.default.acl_submit_applications=*
+yarn.scheduler.capacity.root.default.capacity=100
+yarn.scheduler.capacity.root.default.maximum-capacity=100
+yarn.scheduler.capacity.root.default.ordering-policy=fair
+yarn.scheduler.capacity.root.default.state=RUNNING
+yarn.scheduler.capacity.root.maximum-capacity=100
+yarn.scheduler.capacity.root.priority=99
+yarn.scheduler.capacity.root.queues=default
