@@ -13,6 +13,7 @@ import os
 
 warnings.filterwarnings('ignore')
 
+
 def init_baostock_process():
     """在每个进程中初始化baostock连接"""
     try:
@@ -24,6 +25,7 @@ def init_baostock_process():
         traceback.print_exc()
         print(f"进程 {os.getpid()} 登录baostock失败: {str(e)}")
         return False
+
 
 def safe_float_convert(value):
     """安全转换为浮点数，处理空值和无效值"""
@@ -71,7 +73,7 @@ def get_single_stock_performance_process(args):
     """
     # 解包参数
     ts_code, name, start_date, end_date = args
-    
+
     # 每个进程需要单独登录baostock
     login_result = init_baostock_process()
     if not login_result:
@@ -81,22 +83,22 @@ def get_single_stock_performance_process(args):
     try:
         # 使用传入的完整股票代码（已包含交易所前缀）
         bs_code = ts_code
-        
+
         # 从baostock获取股票历史数据
         rs = bs.query_history_k_data_plus(bs_code,
-                                         "date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,tradestatus,pctChg,isST,peTTM,pbMRQ,psTTM,pcfNcfTTM",
-                                         start_date=start_date, end_date=end_date, 
-                                         frequency="d", adjustflag="1")  # 使用后复权数据
-        
+                                          "date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,tradestatus,pctChg,isST,peTTM,pbMRQ,psTTM,pcfNcfTTM",
+                                          start_date=start_date, end_date=end_date,
+                                          frequency="d", adjustflag="1")  # 使用后复权数据
+
         data_list = []
         while (rs.error_code == '0') & (rs.next()):
             data_list.append(rs.get_row_data())
-        
+
         if len(data_list) == 0:
             print(f"进程 {os.getpid()}: 未能获取到股票 {ts_code} 的数据")
             # bs.logout()  # 登出当前进程的baostock
             return None
-        
+
         df = pd.DataFrame(data_list, columns=rs.fields)
 
         if df.empty or len(df) < 250:  # 至少需要一年的日线数据
@@ -116,6 +118,7 @@ def get_single_stock_performance_process(args):
         psTTM = float(df.iloc[-1]['psTTM'])
         pcfNcfTTM = float(df.iloc[-1]['pcfNcfTTM'])
 
+
         if start_price <= 0:
             # bs.logout()  # 登出当前进程的baostock
             return None
@@ -125,7 +128,7 @@ def get_single_stock_performance_process(args):
         actual_end_date = pd.to_datetime(df.iloc[-1]['date'])
         years = (actual_end_date - actual_start_date).days / 365.25
 
-        if years < 5:  # 至少需要2年数据
+        if years < 3:  # 至少需要2年数据
             # bs.logout()  # 登出当前进程的baostock
             return None
 
@@ -151,9 +154,25 @@ def get_single_stock_performance_process(args):
         total_trading_days = len(df.dropna(subset=['daily_return']))
         win_rate = positive_returns / total_trading_days if total_trading_days > 0 else 0
 
+        # 获取前复权收盘股价
+        rs_front = bs.query_history_k_data_plus(bs_code,
+                                                "date,code,open,high,low,close,preclose,volume,amount,adjustflag",
+                                                start_date=start_date, end_date=end_date,
+                                                frequency="d", adjustflag="2")  # 使用后复权数据
 
-        year=2025
-        quarter=3
+        data_list_f = []
+        while (rs_front.error_code == '0') & (rs_front.next()):
+            data_list_f.append(rs_front.get_row_data())
+
+        if len(data_list_f) == 0:
+            front_price = 0
+        else:
+            df_f = pd.DataFrame(data_list_f, columns=rs_front.fields)
+            front_price = safe_float_convert(df_f.iloc[-1]['close'])
+
+
+        year = 2025
+        quarter = 3
         # 成长能力
         growth_list = []
         rs_growth = bs.query_growth_data(code=bs_code, year=year, quarter=quarter)
@@ -186,7 +205,7 @@ def get_single_stock_performance_process(args):
             cashRatio = 0
             YOYLiability = 0
             liabilityToAsset = 0
-            assetToEquity= 0
+            assetToEquity = 0
         else:
             result_balance = pd.DataFrame(balance_list, columns=rs_balance.fields)
             currentRatio = safe_float_convert(result_balance.iloc[-1]['currentRatio'])
@@ -208,7 +227,7 @@ def get_single_stock_performance_process(args):
             INVTurnRatio = 0
             INVTurnDays = 0
             CATurnRatio = 0
-            AssetTurnRatio =0
+            AssetTurnRatio = 0
         else:
             result_operation = pd.DataFrame(operation_list, columns=rs_operation.fields)
             NRTurnRatio = safe_float_convert(result_operation.iloc[-1]['NRTurnRatio'])
@@ -231,8 +250,8 @@ def get_single_stock_performance_process(args):
             netProfit = 0
             epsTTM = 0
             MBRevenue = 0
-            totalShare=0
-            liqaShare=0
+            totalShare = 0
+            liqaShare = 0
         else:
             result_profit = pd.DataFrame(profit_list, columns=rs_profit.fields)
             roeAvg = safe_float_convert(result_profit.iloc[-1]['roeAvg'])
@@ -244,6 +263,18 @@ def get_single_stock_performance_process(args):
             totalShare = safe_float_convert(result_profit.iloc[-1]['totalShare'])
             liqaShare = safe_float_convert(result_profit.iloc[-1]['liqaShare'])
 
+        ## 每股分红
+        rs_list = []
+        rs_dividend = bs.query_dividend_data(code=bs_code, year=year, yearType="report")
+        while (rs_dividend.error_code == '0') & rs_dividend.next():
+            rs_list.append(rs_dividend.get_row_data())
+        if len(rs_list) == 0:
+            dividCashPsBeforeTax = 0
+
+        else:
+            result_dividend = pd.DataFrame(rs_list, columns=rs_dividend.fields)
+            dividCashPsBeforeTax = safe_float_convert(result_dividend['dividCashPsBeforeTax'].astype(float, errors='ignore').sum())
+
 
         return {
             'ts_code': ts_code,
@@ -253,6 +284,7 @@ def get_single_stock_performance_process(args):
             'years': round(years, 2),
             'start_price': round(start_price, 2),
             'end_price': round(end_price, 2),
+            'front_price': round(front_price, 2),
             'total_return_pct': round(total_return * 100, 2),
             'annualized_return_pct': round(annualized_return * 100, 2),
             'volatility_pct': round(volatility * 100, 2),
@@ -287,7 +319,8 @@ def get_single_stock_performance_process(args):
             'epsTTM': round(epsTTM, 2),
             'MBRevenue': round(MBRevenue, 2),
             'totalShare': round(totalShare, 2),
-            'liqaShare': round(liqaShare, 2)
+            'liqaShare': round(liqaShare, 2),
+            'dividCashPsBeforeTax': round(dividCashPsBeforeTax, 2)
 
         }
 
@@ -308,7 +341,7 @@ def export_results_to_excel(results, filename):
     if results.empty:
         print("没有数据可导出")
         return
-    
+
     # 创建中文列名映射
     chinese_column_names = {
         'ts_code': '股票代码',
@@ -318,6 +351,7 @@ def export_results_to_excel(results, filename):
         'years': '年数',
         'start_price': '起始价格',
         'end_price': '结束价格',
+        'front_price': '前复权价格',
         'total_return_pct': '总收益率%',
         'annualized_return_pct': '年化收益率%',
         'volatility_pct': '波动率%',
@@ -352,17 +386,18 @@ def export_results_to_excel(results, filename):
         'epsTTM': '每股收益',
         'MBRevenue': '主营业务收入',
         'totalShare': '总股本',
-        'liqaShare': '流通股本'
+        'liqaShare': '流通股本',
+        'dividCashPsBeforeTax': '每股分红税前'
     }
 
     # 复制结果数据框以避免修改原始数据
     results_chinese = results.rename(columns=chinese_column_names)
-    results_chinese=apply_formatting_to_excel_column(results_chinese, '净利润')
-    results_chinese=apply_formatting_to_excel_column(results_chinese, '主营业务收入')
-    
+    results_chinese = apply_formatting_to_excel_column(results_chinese, '净利润')
+    results_chinese = apply_formatting_to_excel_column(results_chinese, '主营业务收入')
+
     # 筛选年化收益率≥15%的股票
     high_return_stocks = results_chinese[results_chinese['年化收益率%'] >= 15]
-    
+
     with pd.ExcelWriter(filename, engine='openpyxl') as writer:
         # 高收益股票清单
         if not high_return_stocks.empty:
@@ -370,7 +405,7 @@ def export_results_to_excel(results, filename):
         else:
             # 创建空的工作表
             pd.DataFrame().to_excel(writer, sheet_name='年化收益率≥15%股票', index=False)
-        
+
         # 全部股票清单
         results_chinese.to_excel(writer, sheet_name='全部分析股票', index=False)
 
@@ -379,11 +414,13 @@ def export_results_to_excel(results, filename):
             # 选择数值型列进行统计
             numeric_cols = ['年化收益率%', '总收益率%', '波动率%', '夏普比率', '最大回撤%', '胜率%', '年数']
             available_numeric_cols = [col for col in numeric_cols if col in results_chinese.columns]
-            
+
             if available_numeric_cols:
                 # 为年化收益率≥15%的股票生成统计摘要（如果存在）
-                high_return_subset = high_return_stocks[available_numeric_cols] if not high_return_stocks.empty else pd.DataFrame(columns=available_numeric_cols)
-                
+                high_return_subset = high_return_stocks[
+                    available_numeric_cols] if not high_return_stocks.empty else pd.DataFrame(
+                    columns=available_numeric_cols)
+
                 if not high_return_subset.empty:
                     performance_summary = high_return_subset[available_numeric_cols].describe()
                     performance_summary.index = ['计数', '均值', '标准差', '最小值', '25%', '50%', '75%', '最大值']
@@ -393,10 +430,17 @@ def export_results_to_excel(results, filename):
                     performance_summary = results_chinese[available_numeric_cols].describe()
                     performance_summary.index = ['计数', '均值', '标准差', '最小值', '25%', '50%', '75%', '最大值']
                     performance_summary.to_excel(writer, sheet_name='全部股票统计摘要')
-    
+
     print(f"结果已保存至: {filename}")
     print(f"共找到 {len(high_return_stocks)} 只年化收益率≥15%的股票")
 
+def get_a_excel_list():
+    df = pd.read_excel("样本整理.xlsx")
+    df = df.drop_duplicates(subset=['股票代码'])
+    result = df[['股票代码', '股票名称']].rename(columns={'股票代码': 'code', '股票名称': 'code_name'})
+    # 返回前100只股票作为示例
+    sample_stocks = result.head(10000)[['code', 'code_name']].rename(columns={'code_name': 'name'})
+    return sample_stocks
 
 def get_a_share_list():
     """
@@ -406,34 +450,28 @@ def get_a_share_list():
     try:
         # 登录baostock
         lg = bs.login()
-        
-        # # 获取沪深A股信息
-        # rs = bs.query_stock_basic()  # 不使用日期和类型参数
-        #
-        # data_list = []
-        # while (rs.error_code == '0') & (rs.next()):
-        #     data_list.append(rs.get_row_data())
-        #
-        # result = pd.DataFrame(data_list, columns=rs.fields)
-        
-        # # 选择部分重点股票进行分析（因为全部分析会很耗时）
-        # # 过滤掉ST股票
-        # result = result[result['code_name'].str.contains('ST') == False]
 
-        df = pd.read_excel("样本整理.xlsx")
-        df = df.drop_duplicates(subset=['股票代码'])
-        result = df[['股票代码', '股票名称']].rename(columns={'股票代码': 'code', '股票名称': 'code_name'})
-        # 返回前100只股票作为示例
-        sample_stocks = result.head(10000)[['code', 'code_name']].rename(columns={'code_name': 'name'})
-        
-        # 保持股票代码完整格式（包含sh./sz.前缀），因为baostock的API需要完整代码
-        # 不移除交易所前缀，直接使用完整的股票代码
-        
-        # 登出baostock
+        # 获取沪深A股信息
+        rs = bs.query_stock_basic()  # 不使用日期和类型参数
+
+        data_list = []
+        while (rs.error_code == '0') & (rs.next()):
+            data_list.append(rs.get_row_data())
+
+        result = pd.DataFrame(data_list, columns=rs.fields)
+
+        # 选择部分重点股票进行分析（因为全部分析会很耗时）
+        # 过滤掉ST股票
+        result = result[result['code_name'].str.contains('ST') == False]
+        #保持股票代码完整格式（包含sh./sz.前缀），因为baostock的API需要完整代码
+        #不移除交易所前缀，直接使用完整的股票代码
+        #登出baostock
+        sample_stocks = result.head(100)
+
         bs.logout()
-        
+
         return sample_stocks
-        
+
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -446,7 +484,7 @@ def get_a_share_list():
             {'code': 'sh.600036', 'name': '招商银行'},
 
         ]
-        
+
         return pd.DataFrame(sample_stocks)
 
 
@@ -456,14 +494,15 @@ def advanced_analysis_with_multiprocessing(stock_limit=50):  # 限制股票数�
     """
     # 设置时间范围（过去10年数据）
     end_date = datetime.now().strftime('%Y-%m-%d')
-    start_date = (datetime.now() - timedelta(days=26 * 365)).strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=40 * 365)).strftime('%Y-%m-%d')
 
     print(f"分析期间: {start_date} 到 {end_date}")
     print("正在获取A股股票列表...")
 
     # 获取A股股票列表
     try:
-        stock_info = get_a_share_list()
+        # stock_info = get_a_share_list()
+        stock_info = get_a_excel_list()
         # 限制数量以进行快速测试
         stock_list = stock_info.head(stock_limit)  # 分析前50只股票
         print(f"获取到 {len(stock_list)} 只股票信息，开始分析...")
@@ -474,22 +513,22 @@ def advanced_analysis_with_multiprocessing(stock_limit=50):  # 限制股票数�
         return pd.DataFrame(), pd.DataFrame()
 
     results = []
-    
+
     # 准备参数列表
-    stock_args = [(row['code'], row['name'], start_date, end_date) 
+    stock_args = [(row['code'], row['name'], start_date, end_date)
                   for index, row in stock_list.iterrows()]
-    
+
     # 使用进程池处理股票数据
     max_workers = min(20, len(stock_args))  # 控制进程数量，避免资源占用过高
     print(f"启动 {max_workers} 个进程进行分析...")
-    
+
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         # 提交任务
         future_to_stock = {
-            executor.submit(get_single_stock_performance_process, args): args[0:2] 
+            executor.submit(get_single_stock_performance_process, args): args[0:2]
             for args in stock_args
         }
-        
+
         # 收集结果
         completed = 0
         successful = 0
@@ -503,7 +542,7 @@ def advanced_analysis_with_multiprocessing(stock_limit=50):  # 限制股票数�
                 import traceback
                 traceback.print_exc()
                 print(f"处理股票任务时出错: {str(e)}")
-            
+
             completed += 1
             if completed % 5 == 0 or completed == len(stock_list):
                 print(f"进度: 已完成 {completed}/{len(stock_list)} 只股票的处理，成功 {successful} 只")
@@ -525,10 +564,10 @@ def main():
     """
     主函数
     """
-    print("="*60)
+    print("=" * 60)
     print("使用baostock分析A股市场年化收益率超过15%的股票（多进程版本）")
     print("分析指标包括：年化收益率、总收益率、波动率、夏普比率、最大回撤、胜率等")
-    print("="*60)
+    print("=" * 60)
 
     try:
         # 执行分析
@@ -551,24 +590,24 @@ def main():
         high_results_df = all_results_df[all_results_df['annualized_return_pct'] >= 15].sort_values(
             'annualized_return_pct', ascending=False
         ).reset_index(drop=True)
-        
+
         print(f"\n分析完成！共找到 {len(high_results_df)} 只年化收益率≥15%的股票")
 
         if len(high_results_df) > 0:
             print("\n前10名高收益股票详情:")
             display_cols = [
-                'ts_code', 'name', 'annualized_return_pct', 
-                'total_return_pct', 'years', 'volatility_pct', 
+                'ts_code', 'name', 'annualized_return_pct',
+                'total_return_pct', 'years', 'volatility_pct',
                 'sharpe_ratio', 'max_drawdown_pct', 'win_rate_pct'
             ]
             print(high_results_df[display_cols].head(10).to_string(index=False))
-            
+
             print(f"\n年化收益率分布情况:")
             print(f"最高年化收益率: {high_results_df['annualized_return_pct'].max():.2f}%")
             print(f"最低年化收益率: {high_results_df['annualized_return_pct'].min():.2f}%")
             print(f"平均年化收益率: {high_results_df['annualized_return_pct'].mean():.2f}%")
             print(f"收益率中位数: {high_results_df['annualized_return_pct'].median():.2f}%")
-            
+
 
         else:
             print("\n在当前分析的股票中未找到年化收益率≥15%的股票")
