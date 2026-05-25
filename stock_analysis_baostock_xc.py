@@ -290,6 +290,7 @@ def get_single_stock_performance_process(args):
             'front_price': round(front_price, 2),
             'total_return_pct': round(total_return * 100, 2),
             'annualized_return_pct': round(annualized_return * 100, 2),
+            'dividend': round(dividCashPsBeforeTax / front_price if front_price != 0 else 1, 4),
             'volatility_pct': round(volatility * 100, 2),
             'sharpe_ratio': round(sharpe_ratio, 2),
             'max_drawdown_pct': round(max_drawdown * 100, 2),
@@ -355,24 +356,29 @@ def export_results_to_excel(results, filename):
         'front_price': '前复权价格',
         'total_return_pct': '总收益率%',
         'annualized_return_pct': '年化收益率%',
+        'dividend': '股息率',
+        'liabilityToAsset': '资产负债率',
+        'roeAvg': '净资产收益率[盈利能力]',
+        'npMargin': '销售净利率',
+        'gpMargin': '销售毛利率',
+        'netProfit': '净利润',
+        'peTTM': '滚动市盈率',
+        'pbMRQ': '市净率',
+        'psTTM': '滚动市销率',
+        'YOYEquity': '净资产同比增长率[成长能力]',
+        'YOYAsset': '总资产同比增长率',
+        'YOYNI': '净利润同比增长率',
+        'YOYLiability': '总负债同比增长率',
         'volatility_pct': '波动率%',
         'sharpe_ratio': '夏普比率',
         'max_drawdown_pct': '最大回撤%',
         'win_rate_pct': '胜率%',
-        'peTTM': '滚动市盈率',
-        'pbMRQ': '市净率',
-        'psTTM': '滚动市销率',
         'pcfNcfTTM': '滚动市现率',
-        'YOYEquity': '净资产同比增长率[成长能力]',
-        'YOYAsset': '总资产同比增长率',
-        'YOYNI': '净利润同比增长率',
         'YOYEPSBasic': '基本每股收益同比增长率',
         'YOYPNI': '归属母公司股东净利润同比增长率',
         'currentRatio': '流动比率[偿债能力]',
         'quickRatio': '速动比率',
         'cashRatio': '现金比率',
-        'YOYLiability': '总负债同比增长率',
-        'liabilityToAsset': '资产负债率',
         'assetToEquity': '权益乘数',
         'NRTurnRatio': '应收账款周转率(次)[运营能力]',
         'NRTurnDays': '应收账款周转天数(天)',
@@ -380,10 +386,6 @@ def export_results_to_excel(results, filename):
         'INVTurnDays': '存货周转天数(天)',
         'CATurnRatio': '流动资产周转率(次)',
         'AssetTurnRatio': '总资产周转率',
-        'roeAvg': '净资产收益率[盈利能力]',
-        'npMargin': '销售净利率',
-        'gpMargin': '销售毛利率',
-        'netProfit': '净利润',
         'epsTTM': '每股收益',
         'MBRevenue': '主营业务收入',
         'totalShare': '总股本',
@@ -503,8 +505,8 @@ def advanced_analysis_with_multiprocessing(stock_limit=50):  # 限制股票数�
 
     # 获取A股股票列表
     try:
-        # stock_info = get_a_share_list()
-        stock_info = get_a_excel_list()
+        stock_info = get_a_share_list()
+        # stock_info = get_a_excel_list()
         # 限制数量以进行快速测试
         stock_list = stock_info.head(stock_limit)  # 分析前50只股票
         print(f"获取到 {len(stock_list)} 只股票信息，开始分析...")
