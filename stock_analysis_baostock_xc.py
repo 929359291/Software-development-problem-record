@@ -35,7 +35,7 @@ def init_baostock_process():
 
 def safe_float_convert(value):
     """安全转换为浮点数，处理空值和无效值"""
-    if value is None or value == '' or pd.isna(value):
+    if value is None or str(value).strip() == '' or pd.isna(value):
         return 0
     try:
         return float(value)
