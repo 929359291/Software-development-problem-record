@@ -10,8 +10,14 @@ from datetime import datetime, timedelta
 import warnings
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import os
+import multiprocessing
 
 warnings.filterwarnings('ignore')
+
+# macOS上fork模式会导致子进程继承父进程的锁状态，容易死锁
+# 必须使用spawn模式来安全地创建子进程
+if __name__ == '__main__':
+    multiprocessing.set_start_method('spawn', force=True)
 
 
 def init_baostock_process():
@@ -73,7 +79,7 @@ def get_single_stock_performance_process(args):
     """
     # 解包参数
     ts_code, name, start_date, end_date = args
-
+    pid = str(os.getpid())
     # 每个进程需要单独登录baostock
     login_result = init_baostock_process()
     if not login_result:
@@ -96,13 +102,11 @@ def get_single_stock_performance_process(args):
 
         if len(data_list) == 0:
             print(f"进程 {os.getpid()}: 未能获取到股票 {ts_code} 的数据")
-            # bs.logout()  # 登出当前进程的baostock
             return None
 
         df = pd.DataFrame(data_list, columns=rs.fields)
 
         if df.empty or len(df) < 250:  # 至少需要一年的日线数据
-            # bs.logout()  # 登出当前进程的baostock
             return None
 
         # 确保数值列是数字类型
@@ -111,16 +115,15 @@ def get_single_stock_performance_process(args):
         df = df.sort_values('date').reset_index(drop=True)
 
         # 获取起始和结束价格
-        start_price = float(df.iloc[0]['close'])
-        end_price = float(df.iloc[-1]['close'])
-        peTTM = float(df.iloc[-1]['peTTM'])
-        pbMRQ = float(df.iloc[-1]['pbMRQ'])
-        psTTM = float(df.iloc[-1]['psTTM'])
-        pcfNcfTTM = float(df.iloc[-1]['pcfNcfTTM'])
+        start_price = safe_float_convert(float(df.iloc[0]['close']))
+        end_price = safe_float_convert(float(df.iloc[-1]['close']))
+        peTTM = safe_float_convert(float(df.iloc[-1]['peTTM']))
+        pbMRQ = safe_float_convert(float(df.iloc[-1]['pbMRQ']))
+        psTTM = safe_float_convert(float(df.iloc[-1]['psTTM']))
+        pcfNcfTTM = safe_float_convert(float(df.iloc[-1]['pcfNcfTTM']))
 
 
         if start_price <= 0:
-            # bs.logout()  # 登出当前进程的baostock
             return None
 
         # 计算时间跨度
@@ -128,8 +131,7 @@ def get_single_stock_performance_process(args):
         actual_end_date = pd.to_datetime(df.iloc[-1]['date'])
         years = (actual_end_date - actual_start_date).days / 365.25
 
-        if years < 3:  # 至少需要2年数据
-            # bs.logout()  # 登出当前进程的baostock
+        if years < 5:  # 至少需要2年数据
             return None
 
         # 计算各种指标
@@ -171,8 +173,9 @@ def get_single_stock_performance_process(args):
             front_price = safe_float_convert(df_f.iloc[-1]['close'])
 
 
-        year = 2025
-        quarter = 3
+        year = 2026
+        year_before = 2025
+        quarter = 1
         # 成长能力
         growth_list = []
         rs_growth = bs.query_growth_data(code=bs_code, year=year, quarter=quarter)
@@ -265,7 +268,7 @@ def get_single_stock_performance_process(args):
 
         ## 每股分红
         rs_list = []
-        rs_dividend = bs.query_dividend_data(code=bs_code, year=year, yearType="report")
+        rs_dividend = bs.query_dividend_data(code=bs_code, year=year_before, yearType="report")
         while (rs_dividend.error_code == '0') & rs_dividend.next():
             rs_list.append(rs_dividend.get_row_data())
         if len(rs_list) == 0:
@@ -276,7 +279,7 @@ def get_single_stock_performance_process(args):
             dividCashPsBeforeTax = safe_float_convert(result_dividend['dividCashPsBeforeTax'].astype(float, errors='ignore').sum())
 
 
-        return {
+        result = {
             'ts_code': ts_code,
             'name': name,
             'start_date': actual_start_date.strftime('%Y-%m-%d'),
@@ -321,16 +324,14 @@ def get_single_stock_performance_process(args):
             'totalShare': round(totalShare, 2),
             'liqaShare': round(liqaShare, 2),
             'dividCashPsBeforeTax': round(dividCashPsBeforeTax, 2)
-
         }
+        return result
 
     except Exception as e:
         import traceback
         traceback.print_exc()
         print(f"进程 {os.getpid()}: 处理股票 {ts_code} ({name}) 时出错: {str(e)}")
-        # 确保即使出错也要登出当前进程的baostock
-
-        return None
+    return None
 
 
 def export_results_to_excel(results, filename):
@@ -459,6 +460,7 @@ def get_a_share_list():
             data_list.append(rs.get_row_data())
 
         result = pd.DataFrame(data_list, columns=rs.fields)
+        print(rs.fields)
 
         # 选择部分重点股票进行分析（因为全部分析会很耗时）
         # 过滤掉ST股票
@@ -466,7 +468,7 @@ def get_a_share_list():
         #保持股票代码完整格式（包含sh./sz.前缀），因为baostock的API需要完整代码
         #不移除交易所前缀，直接使用完整的股票代码
         #登出baostock
-        sample_stocks = result.head(100)
+        sample_stocks = result.head(10000)[['code', 'code_name']].rename(columns={'code_name': 'name'})
 
         bs.logout()
 
@@ -494,7 +496,7 @@ def advanced_analysis_with_multiprocessing(stock_limit=50):  # 限制股票数�
     """
     # 设置时间范围（过去10年数据）
     end_date = datetime.now().strftime('%Y-%m-%d')
-    start_date = (datetime.now() - timedelta(days=40 * 365)).strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=35 * 365)).strftime('%Y-%m-%d')
 
     print(f"分析期间: {start_date} 到 {end_date}")
     print("正在获取A股股票列表...")
@@ -513,23 +515,24 @@ def advanced_analysis_with_multiprocessing(stock_limit=50):  # 限制股票数�
         return pd.DataFrame(), pd.DataFrame()
 
     results = []
-
     # 准备参数列表
     stock_args = [(row['code'], row['name'], start_date, end_date)
                   for index, row in stock_list.iterrows()]
 
     # 使用进程池处理股票数据
-    max_workers = min(20, len(stock_args))  # 控制进程数量，避免资源占用过高
+    max_workers = min(15, len(stock_args))  # 控制进程数量，避免资源占用过高
     print(f"启动 {max_workers} 个进程进行分析...")
 
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+    # 使用spawn上下文创建进程池，避免macOS上fork导致的死锁
+    mp_context = multiprocessing.get_context('spawn')
+    with ProcessPoolExecutor(max_workers=max_workers, mp_context=mp_context) as executor:
         # 提交任务
         future_to_stock = {
             executor.submit(get_single_stock_performance_process, args): args[0:2]
             for args in stock_args
         }
 
-        # 收集结果
+        # 收集结果，设置超时避免永久阻塞
         completed = 0
         successful = 0
         for future in as_completed(future_to_stock):
@@ -538,20 +541,19 @@ def advanced_analysis_with_multiprocessing(stock_limit=50):  # 限制股票数�
                 if result:
                     results.append(result)
                     successful += 1
-            except Exception as e:
+            except BaseException as e:
                 import traceback
                 traceback.print_exc()
-                print(f"处理股票任务时出错: {str(e)}")
+                print(f"[ERROR] 处理股票任务时出错: {e}")
 
             completed += 1
-            if completed % 5 == 0 or completed == len(stock_list):
+            if completed % 2 == 0 or completed == len(stock_list):
                 print(f"进度: 已完成 {completed}/{len(stock_list)} 只股票的处理，成功 {successful} 只")
-
     # 创建结果DataFrame
     result_df = pd.DataFrame(results)
 
     # 筛选年化收益率大于等于15%的股票
-    high_performers = result_df[result_df['annualized_return_pct'] >= 5].sort_values(
+    high_performers = result_df[result_df['annualized_return_pct'] >= 15].sort_values(
         'annualized_return_pct', ascending=False
     ).reset_index(drop=True)
 
