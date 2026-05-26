@@ -8,9 +8,9 @@ import numpy as np
 import baostock as bs
 from datetime import datetime, timedelta
 import warnings
-from concurrent.futures import ProcessPoolExecutor, as_completed
 import os
 import multiprocessing
+from multiprocessing import TimeoutError as MPTimeoutError
 
 warnings.filterwarnings('ignore')
 
@@ -89,6 +89,7 @@ def get_single_stock_performance_process(args):
     try:
         # 使用传入的完整股票代码（已包含交易所前缀）
         bs_code = ts_code
+
 
         # 从baostock获取股票历史数据
         rs = bs.query_history_k_data_plus(bs_code,
@@ -505,8 +506,8 @@ def advanced_analysis_with_multiprocessing(stock_limit=50):  # 限制股票数�
 
     # 获取A股股票列表
     try:
-        stock_info = get_a_share_list()
-        # stock_info = get_a_excel_list()
+        # stock_info = get_a_share_list()
+        stock_info = get_a_excel_list()
         # 限制数量以进行快速测试
         stock_list = stock_info.head(stock_limit)  # 分析前50只股票
         print(f"获取到 {len(stock_list)} 只股票信息，开始分析...")
@@ -522,37 +523,49 @@ def advanced_analysis_with_multiprocessing(stock_limit=50):  # 限制股票数�
                   for index, row in stock_list.iterrows()]
 
     # 使用进程池处理股票数据
-    max_workers = min(15, len(stock_args))  # 控制进程数量，避免资源占用过高
+    max_workers = min(10, len(stock_args))  # 控制进程数量，避免资源占用过高
     print(f"启动 {max_workers} 个进程进行分析...")
 
     # 使用spawn上下文创建进程池，避免macOS上fork导致的死锁
     mp_context = multiprocessing.get_context('spawn')
-    with ProcessPoolExecutor(max_workers=max_workers, mp_context=mp_context) as executor:
-        # 提交任务
-        future_to_stock = {
-            executor.submit(get_single_stock_performance_process, args): args[0:2]
-            for args in stock_args
-        }
+    pool = mp_context.Pool(processes=max_workers)
 
-        # 收集结果，设置超时避免永久阻塞
+    try:
+        # 提交所有任务
+        async_results = []
+        for args in stock_args:
+            ar = pool.apply_async(get_single_stock_performance_process, (args,))
+            async_results.append((ar, args[0:2]))
+
+        # 收集结果，设置单任务超时避免永久阻塞
         completed = 0
         successful = 0
-        for future in as_completed(future_to_stock):
+        per_task_timeout = 30  # 每只股票最多60秒
+
+        for ar, stock_info_pair in async_results:
             try:
-                result = future.result()
+                result = ar.get(timeout=per_task_timeout)
                 if result:
                     results.append(result)
                     successful += 1
-            except BaseException as e:
+            except MPTimeoutError:
+                print(f"[WARNING] 股票 {stock_info_pair} 处理超时，跳过")
+            except Exception as e:
                 import traceback
                 traceback.print_exc()
-                print(f"[ERROR] 处理股票任务时出错: {e}")
+                print(f"[ERROR] 处理股票 {stock_info_pair} 任务时出错: {e}")
 
             completed += 1
             if completed % 2 == 0 or completed == len(stock_list):
                 print(f"进度: 已完成 {completed}/{len(stock_list)} 只股票的处理，成功 {successful} 只")
+    finally:
+        pool.terminate()
+        pool.join()
+
+    print("baostock接口访问完成")
     # 创建结果DataFrame
     result_df = pd.DataFrame(results)
+
 
     # 筛选年化收益率大于等于15%的股票
     high_performers = result_df[result_df['annualized_return_pct'] >= 15].sort_values(
