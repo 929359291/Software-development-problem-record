@@ -20,6 +20,7 @@ import urllib.request
 import webbrowser
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from io import BytesIO
 from pathlib import Path
 
 HOST = "127.0.0.1"
@@ -39,10 +40,11 @@ REALTIME_VALUATION_API = "https://d.10jqka.com.cn/v2/realhead/hs_{code}/last.js"
 COMPANY_SURVEY_API = "https://emweb.securities.eastmoney.com/PC_HSF10/CompanySurvey/PageAjax?code={market_code}"
 
 HTML = r'''<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>A股财务望远镜</title><style>
-:root{--bg:#07111f;--panel:#0e1b2d;--panel2:#13243b;--line:#263a55;--text:#edf4ff;--muted:#8fa5c2;--blue:#5ca8ff;--cyan:#64dfdf;--green:#65d6a6;--red:#ff7a90;--amber:#ffc857}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px Arial,"PingFang SC",sans-serif}button,input{font:inherit}.shell{min-height:100vh;display:grid;grid-template-columns:260px 1fr}.side{border-right:1px solid var(--line);padding:24px 18px;background:#091525}.brand{font-size:20px;font-weight:700}.tag{color:var(--muted);font-size:12px;margin:6px 0 28px}.side h3{font-size:12px;letter-spacing:.12em;color:var(--muted);margin:20px 8px 10px}.listrow{display:grid;grid-template-columns:1fr 28px;gap:3px;align-items:center}.fav{width:100%;display:flex;justify-content:space-between;align-items:center;padding:11px 8px 11px 12px;border:0;border-radius:8px;color:var(--text);background:transparent;cursor:pointer;text-align:left;min-width:0}.fav:hover,.fav.active{background:var(--panel2)}.fav small{color:var(--muted);margin-left:6px}.remove{border:0;background:transparent;color:var(--muted);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:18px;line-height:1}.remove:hover{background:#3a1d2a;color:var(--red)}.empty{color:var(--muted);padding:12px}.main{padding:16px 22px;overflow:hidden}.top{display:flex;gap:12px;align-items:center}.searchbox{position:relative;flex:1;max-width:700px}.searchbox input{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:13px 16px;border-radius:9px;outline:none}.searchbox input:focus{border-color:var(--blue)}.results{position:absolute;z-index:9;top:49px;left:0;right:0;background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden}.result{padding:11px 14px;cursor:pointer;display:flex;justify-content:space-between}.result:hover{background:#1b3352}.btn{border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:11px 14px;border-radius:8px;cursor:pointer}.btn:hover{border-color:var(--blue)}.btn.primary{background:var(--blue);border-color:var(--blue);color:#051120;font-weight:700}.status{min-height:20px;color:var(--muted);padding:7px 2px}.hero{display:flex;justify-content:space-between;align-items:flex-end;margin:8px 0 10px}.company h1{font-size:26px;margin:0 0 4px}.company p{color:var(--muted);margin:0;font-size:12px}.badge{padding:5px 9px;border-radius:20px;background:#17324d;color:var(--cyan);font-size:12px}.cards{display:grid;grid-template-columns:repeat(10,minmax(88px,1fr));gap:7px}.card{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:11px 12px;min-width:0}.card .label{color:var(--muted);font-size:11px;display:flex;align-items:center;gap:5px;white-space:nowrap}.card .value{font-size:20px;font-weight:700;margin:7px 0 3px;white-space:nowrap}.card .year{color:var(--muted);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.info{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border:1px solid var(--line);border-radius:50%;font-size:10px;color:var(--cyan);cursor:help;flex:none}.workspace{margin-top:9px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:11px 14px}.toolbar{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:7px}.tabs{display:flex;gap:5px;flex-wrap:wrap}.tab{padding:5px 8px;border:1px solid var(--line);color:var(--muted);background:transparent;border-radius:6px;cursor:pointer;font-size:11px}.tab.active{color:#061525;background:var(--cyan);border-color:var(--cyan)}svg{width:100%;height:285px;display:block}.axis{stroke:#38506d;stroke-width:1}.grid{stroke:#203650;stroke-width:1}.line{fill:none;stroke:var(--cyan);stroke-width:3}.dot{fill:var(--cyan)}.price-line{fill:none;stroke:var(--amber);stroke-width:2.5}.price-dot{fill:var(--amber)}.legend{display:inline-flex;align-items:center;gap:10px;color:var(--muted);font-size:11px}.legend i{display:inline-block;width:18px;height:3px;border-radius:2px}.chart-label{fill:var(--muted);font-size:11px}.tooltip{position:fixed;display:none;background:#06101d;border:1px solid var(--line);padding:8px;border-radius:6px;pointer-events:none}.profile{margin-top:9px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:0 14px}.profile summary{cursor:pointer;padding:11px 0;font-weight:700;list-style:none;display:flex;justify-content:space-between;align-items:center}.profile summary::-webkit-details-marker{display:none}.profile summary:after{content:'展开';color:var(--cyan);font-size:11px;font-weight:400}.profile[open] summary:after{content:'收起'}.profile-body{border-top:1px solid var(--line);padding:12px 0 14px;line-height:1.75}.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.profile-item{background:var(--panel2);border-radius:7px;padding:10px 12px}.profile-item strong{display:block;color:var(--cyan);font-size:12px;margin-bottom:4px}.profile-meta{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;margin-top:10px}.profile-refresh{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:6px;padding:4px 8px;cursor:pointer}.profile-refresh:hover{color:var(--text);border-color:var(--blue)}.address-line{display:grid;grid-template-columns:110px 1fr;gap:8px;margin:3px 0}.address-line span:first-child{color:var(--muted)}.holder-wrap{overflow:auto;margin-top:10px}.holder-table{width:100%;border-collapse:collapse;min-width:820px}.holder-table th,.holder-table td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;font-size:12px}.holder-table th{color:var(--muted);font-weight:400}.holder-table th:first-child,.holder-table td:first-child{text-align:left;white-space:normal;min-width:260px}.forecast{margin-top:9px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:11px 14px}.forecast-summary{color:var(--muted);font-size:11px;line-height:1.7;margin-bottom:8px}.forecast-table{width:100%;border-collapse:collapse;margin-top:8px}.forecast-table th,.forecast-table td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;font-size:12px}.forecast-table th{color:var(--muted);font-weight:400}.forecast-table th:first-child,.forecast-table td:first-child{text-align:left}.fc-opt{color:var(--green)}.fc-neu{color:var(--cyan)}.fc-pes{color:var(--red)}.tablewrap{overflow:auto;max-height:420px}.data-table{border-collapse:collapse;width:100%;min-width:800px}.data-table th,.data-table td{border-bottom:1px solid var(--line);padding:9px 10px;text-align:right;white-space:nowrap}.data-table th:first-child,.data-table td:first-child{text-align:left;position:sticky;left:0;background:var(--panel)}.data-table th{color:var(--muted);font-weight:400}.footer{color:var(--muted);font-size:12px;margin-top:14px}.hidden{display:none!important}@media(max-width:900px){.shell{grid-template-columns:1fr}.side{border:0;border-bottom:1px solid var(--line)}.main{padding:20px}.cards{grid-template-columns:repeat(2,1fr)}}
-</style></head><body><div class="shell"><aside class="side"><div class="brand">A股财务望远镜</div><div class="tag">30年核心指标 · 本地持久缓存</div><h3>收藏股票</h3><div id="favorites"></div><h3>已缓存</h3><div id="cached"></div></aside><main class="main"><div class="top"><div class="searchbox"><input id="search" placeholder="输入股票名称或6位代码，如：泸州老窖 / 000568" autocomplete="off"><div id="results" class="results hidden"></div></div><button id="refresh" class="btn">重新拉取</button><button id="favoriteBtn" class="btn primary">收藏</button></div><div id="status" class="status">搜索股票开始查看。输入代码时可直接回车。</div><section id="content" class="hidden"><div class="hero"><div class="company"><h1 id="name"></h1><p><span id="code"></span> · 数据来源：同花顺F10 · <span id="updated"></span></p></div><span id="cacheBadge" class="badge"></span></div><div id="cards" class="cards"></div><div class="workspace"><div class="toolbar"><div><strong>年度趋势</strong><span class="legend"><span><i style="background:var(--cyan)"></i>财务指标</span><span><i style="background:var(--amber)"></i>股价（右轴）</span></span></div><div id="tabs" class="tabs"></div></div><svg id="chart" viewBox="0 0 1000 340" preserveAspectRatio="none"></svg><div id="tip" class="tooltip"></div></div><div id="forecastBox" class="forecast hidden"></div><details id="profileBox" class="profile"><summary>公司与主业介绍</summary><div id="profileContent" class="profile-body"><div class="empty">正在加载公司介绍…</div></div></details><div class="workspace"><div class="toolbar"><strong>核心指标明细</strong><span style="color:var(--muted)">最近30个完整年度 + 最新报告期</span></div><div class="tablewrap"><table id="table" class="data-table"></table></div></div><div class="footer">本工具仅供研究与数据查看，不构成投资建议。公开接口可能调整，刷新失败时会优先保留本地缓存。</div></section></main></div><script>
-const $=s=>document.querySelector(s);let current=null,metric='revenue';const meta={revenue:['营业总收入','亿元'],revenue_growth:['营业收入增速','%'],net_profit:['归母净利润','亿元'],net_profit_growth:['净利润增速','%'],deducted_profit:['扣非净利润','亿元'],gross_margin:['销售毛利率','%'],net_margin:['销售净利率','%'],roe:['净资产收益率','%'],operating_cash_flow:['每股经营现金流','元/股'],debt_ratio:['资产负债率','%'],dividend_yield:['股息率（最新期TTM）','%']};const help={revenue:'公司在报告期内取得的营业总收入；中报/季报为年初至期末累计值。',revenue_growth:'营业总收入相对上年同期的增长率。',net_profit:'归属于母公司股东的净利润；中报/季报为累计值。',net_profit_growth:'归母净利润相对上年同期的增长率。',deducted_profit:'扣除非经常性损益后的归母净利润。',gross_margin:'（营业收入－营业成本）÷营业收入。',net_margin:'净利润÷营业总收入。',roe:'净资产收益率，衡量股东权益的盈利效率。',operating_cash_flow:'每股经营活动现金流；中报/季报为累计值。',debt_ratio:'负债合计÷资产合计。',dividend_yield:'完整年度沿用同花顺税前分红率；最新报告期按最近365天已实施每股现金分红合计÷同花顺最新收盘价。',dynamic_pe:'同花顺动态市盈率原始值：总市值÷按最新报告期推算的全年净利润。',total_return_cagr:'以后复权月线首末收盘价计算，近似反映现金分红和送转再投资后的上市以来复合年化总回报。',historical_total_return:'以后复权期末值÷期初值－1，反映上市以来含现金分红和送转影响的累计总回报。'};const info=k=>`<span class="info" title="${help[k]||''}">?</span>`;
-function status(t,bad=false){$('#status').textContent=t;$('#status').style.color=bad?'var(--red)':'var(--muted)'}function fmt(v,k){if(v==null)return'—';return (['revenue_growth','net_profit_growth','gross_margin','net_margin','roe','debt_ratio','dividend_yield'].includes(k)?(v*100).toFixed(2):Number(v).toFixed(2))+meta[k][1]}
+:root{--bg:#07111f;--panel:#0e1b2d;--panel2:#13243b;--line:#263a55;--text:#edf4ff;--muted:#8fa5c2;--blue:#5ca8ff;--cyan:#64dfdf;--green:#65d6a6;--red:#ff7a90;--amber:#ffc857}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px Arial,"PingFang SC",sans-serif}button,input{font:inherit}.shell{min-height:100vh;display:grid;grid-template-columns:260px 1fr}.side{border-right:1px solid var(--line);padding:24px 18px;background:#091525}.brand{font-size:20px;font-weight:700}.tag{color:var(--muted);font-size:12px;margin:6px 0 28px}.side h3{font-size:12px;letter-spacing:.12em;color:var(--muted);margin:20px 8px 10px}.listrow{display:grid;grid-template-columns:1fr 28px;gap:3px;align-items:center}.fav{width:100%;display:flex;justify-content:space-between;align-items:center;padding:11px 8px 11px 12px;border:0;border-radius:8px;color:var(--text);background:transparent;cursor:pointer;text-align:left;min-width:0}.fav:hover,.fav.active{background:var(--panel2)}.fav small{color:var(--muted);margin-left:6px}.remove{border:0;background:transparent;color:var(--muted);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:18px;line-height:1}.remove:hover{background:#3a1d2a;color:var(--red)}.empty{color:var(--muted);padding:12px}.main{padding:16px 22px;overflow:hidden}.top{display:flex;gap:12px;align-items:center}.searchbox{position:relative;flex:1;max-width:700px}.searchbox input{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:13px 16px;border-radius:9px;outline:none}.searchbox input:focus{border-color:var(--blue)}.results{position:absolute;z-index:9;top:49px;left:0;right:0;background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden}.result{padding:11px 14px;cursor:pointer;display:flex;justify-content:space-between}.result:hover{background:#1b3352}.btn{border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:11px 14px;border-radius:8px;cursor:pointer}.btn:hover{border-color:var(--blue)}.btn.primary{background:var(--blue);border-color:var(--blue);color:#051120;font-weight:700}.status{min-height:20px;color:var(--muted);padding:7px 2px}.hero{display:flex;justify-content:space-between;align-items:flex-end;margin:8px 0 10px}.company h1{font-size:26px;margin:0 0 4px}.company p{color:var(--muted);margin:0;font-size:12px}.badge{padding:5px 9px;border-radius:20px;background:#17324d;color:var(--cyan);font-size:12px}.cards{display:grid;grid-template-columns:repeat(10,minmax(88px,1fr));gap:7px}.card{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:11px 12px;min-width:0}.card .label{color:var(--muted);font-size:11px;display:flex;align-items:center;gap:5px;white-space:nowrap}.card .value{font-size:20px;font-weight:700;margin:7px 0 3px;white-space:nowrap}.card .year{color:var(--muted);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.info{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border:1px solid var(--line);border-radius:50%;font-size:10px;color:var(--cyan);cursor:help;flex:none}.workspace{margin-top:9px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:11px 14px}.toolbar{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:7px}.tabs{display:flex;gap:5px;flex-wrap:wrap}.tab{padding:5px 8px;border:1px solid var(--line);color:var(--muted);background:transparent;border-radius:6px;cursor:pointer;font-size:11px}.tab.active{color:#061525;background:var(--cyan);border-color:var(--cyan)}svg{width:100%;height:285px;display:block}.axis{stroke:#38506d;stroke-width:1}.grid{stroke:#203650;stroke-width:1}.line{fill:none;stroke:var(--cyan);stroke-width:3}.dot{fill:var(--cyan)}.price-line{fill:none;stroke:var(--amber);stroke-width:2.5}.price-dot{fill:var(--amber)}.legend{display:inline-flex;align-items:center;gap:10px;color:var(--muted);font-size:11px}.legend i{display:inline-block;width:18px;height:3px;border-radius:2px}.chart-label{fill:var(--muted);font-size:11px}.tooltip{position:fixed;display:none;background:#06101d;border:1px solid var(--line);padding:8px;border-radius:6px;pointer-events:none}.profile{margin-top:9px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:0 14px}.profile summary{cursor:pointer;padding:11px 0;font-weight:700;list-style:none;display:flex;justify-content:space-between;align-items:center}.profile summary::-webkit-details-marker{display:none}.profile summary:after{content:'展开';color:var(--cyan);font-size:11px;font-weight:400}.profile[open] summary:after{content:'收起'}.profile-body{border-top:1px solid var(--line);padding:12px 0 14px;line-height:1.75}.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.profile-item{background:var(--panel2);border-radius:7px;padding:10px 12px}.profile-item strong{display:block;color:var(--cyan);font-size:12px;margin-bottom:4px}.profile-meta{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;margin-top:10px}.profile-refresh{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:6px;padding:4px 8px;cursor:pointer}.profile-refresh:hover{color:var(--text);border-color:var(--blue)}.address-line{display:grid;grid-template-columns:110px 1fr;gap:8px;margin:3px 0}.address-line span:first-child{color:var(--muted)}.holder-wrap{overflow:auto;margin-top:10px}.holder-table{width:100%;border-collapse:collapse;min-width:820px}.holder-table th,.holder-table td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;font-size:12px}.holder-table th{color:var(--muted);font-weight:400}.holder-table th:first-child,.holder-table td:first-child{text-align:left;white-space:normal;min-width:260px}.forecast{margin-top:9px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:11px 14px}.forecast-summary{color:var(--muted);font-size:11px;line-height:1.7;margin-bottom:8px}.forecast-table{width:100%;border-collapse:collapse;margin-top:8px}.forecast-table th,.forecast-table td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;font-size:12px}.forecast-table th{color:var(--muted);font-weight:400}.forecast-table th:first-child,.forecast-table td:first-child{text-align:left}.fc-opt{color:var(--green)}.fc-neu{color:var(--cyan)}.fc-pes{color:var(--red)}.tablewrap{overflow:auto;max-height:420px}.data-table{border-collapse:collapse;width:100%;min-width:800px}.data-table th,.data-table td{border-bottom:1px solid var(--line);padding:9px 10px;text-align:right;white-space:nowrap}.data-table th:first-child,.data-table td:first-child{text-align:left;position:sticky;left:0;background:var(--panel)}.data-table th{color:var(--muted);font-weight:400}.data-table th.metric-head{cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}.data-table th.metric-head:hover{color:var(--cyan)}.modal-mask{position:fixed;inset:0;background:rgba(2,8,18,.78);z-index:99;display:flex;align-items:center;justify-content:center;padding:20px}.modal{width:min(560px,95vw);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px}.modal h2{margin:0 0 14px;font-size:20px}.modal-row{display:grid;grid-template-columns:80px 1fr;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);line-height:1.6}.modal-row span:first-child{color:var(--cyan)}.modal-close{margin-top:16px;float:right}.footer{color:var(--muted);font-size:12px;margin-top:14px}.hidden{display:none!important}@media(max-width:900px){.shell{grid-template-columns:1fr}.side{border:0;border-bottom:1px solid var(--line)}.main{padding:20px}.cards{grid-template-columns:repeat(2,1fr)}}
+</style></head><body><div class="shell"><aside class="side"><div class="brand">A股财务望远镜</div><div class="tag">30年核心指标 · 本地持久缓存</div><h3>收藏股票</h3><div id="favorites"></div><h3>已缓存</h3><div id="cached"></div></aside><main class="main"><div class="top"><div class="searchbox"><input id="search" placeholder="输入股票名称或6位代码，如：泸州老窖 / 000568" autocomplete="off"><div id="results" class="results hidden"></div></div><button id="refresh" class="btn">重新拉取</button><button id="exportBtn" class="btn">导出Excel</button><button id="favoriteBtn" class="btn primary">收藏</button></div><div id="status" class="status">搜索股票开始查看。输入代码时可直接回车。</div><section id="content" class="hidden"><div class="hero"><div class="company"><h1 id="name"></h1><p><span id="code"></span> · 数据来源：同花顺F10 · <span id="updated"></span></p></div><span id="cacheBadge" class="badge"></span></div><div id="cards" class="cards"></div><div class="workspace"><div class="toolbar"><div><strong>年度趋势</strong><span class="legend"><span><i style="background:var(--cyan)"></i>财务指标</span><span><i style="background:var(--amber)"></i>股价（右轴）</span></span></div><div id="tabs" class="tabs"></div></div><svg id="chart" viewBox="0 0 1000 340" preserveAspectRatio="none"></svg><div id="tip" class="tooltip"></div></div><div id="forecastBox" class="forecast hidden"></div><details id="profileBox" class="profile"><summary>公司与主业介绍</summary><div id="profileContent" class="profile-body"><div class="empty">正在加载公司介绍…</div></div></details><div class="workspace"><div class="toolbar"><strong>核心指标明细</strong><span style="color:var(--muted)">最近30个完整年度 + 最新报告期</span></div><div class="tablewrap"><table id="table" class="data-table"></table></div></div><div class="footer">本工具仅供研究与数据查看，不构成投资建议。公开接口可能调整，刷新失败时会优先保留本地缓存。</div></section></main></div><div id="metricModal" class="modal-mask hidden" onclick="if(event.target===this)closeMetricInfo()"><div class="modal"><h2 id="metricModalTitle"></h2><div id="metricModalBody"></div><button class="btn modal-close" onclick="closeMetricInfo()">关闭</button><div style="clear:both"></div></div></div><script>
+const $=s=>document.querySelector(s);let current=null,metric='revenue';const meta={revenue:['营业总收入','亿元'],revenue_growth:['营业收入增速','%'],net_profit:['归母净利润','亿元'],net_profit_growth:['净利润增速','%'],deducted_profit:['扣非净利润','亿元'],gross_margin:['销售毛利率','%'],net_margin:['销售净利率','%'],roe:['净资产收益率','%'],operating_cash_flow:['每股经营现金流','元/股'],receivable_days:['应收账款回款天数','天'],contract_liability:['合同负债','亿元'],contract_liability_growth:['合同负债增速','%'],ocf_to_profit:['经营现金流/净利润','%'],free_cash_flow:['自由现金流','亿元'],roic:['ROIC','%'],capital_expenditure:['资本开支','亿元'],interest_debt_ratio:['有息负债率','%'],interest_coverage:['利息保障倍数','倍'],enterprise_value:['企业价值EV','亿元'],dcf_per_share:['未来现金流折现','元/股'],debt_ratio:['资产负债率','%'],dividend_yield:['股息率（最新期TTM）','%']};const help={revenue:'公司在报告期内取得的营业总收入；中报/季报为年初至期末累计值。',revenue_growth:'营业总收入相对上年同期的增长率。',net_profit:'归属于母公司股东的净利润；中报/季报为累计值。',net_profit_growth:'归母净利润相对上年同期的增长率。',deducted_profit:'扣除非经常性损益后的归母净利润。',gross_margin:'（营业收入－营业成本）÷营业收入。',net_margin:'净利润÷营业总收入。',roe:'净资产收益率，衡量股东权益的盈利效率。',operating_cash_flow:'每股经营活动现金流；中报/季报为累计值。',receivable_days:'应收账款周转天数，反映从确认赊销收入到收回款项的平均时间；通常越短代表回款效率越高。',enterprise_value:'标准企业价值EV：报告期总市值加有息负债，再减去货币资金，单位亿元。',dcf_per_share:'未来现金流折现每股价值：以最新完整年报EPS近似现金流，按中性增速预测5年并加终值折现；仅最新报告期展示。',contract_liability:'合同负债，通常代表已收款但尚未确认收入的履约义务，单位亿元。',contract_liability_growth:'合同负债相较上年同期的增长率。',ocf_to_profit:'经营活动现金流量净额÷归母净利润，衡量利润转化为现金的质量。',free_cash_flow:'自由现金流＝经营活动现金流量净额－资本开支，单位亿元。',roic:'税后营业利润÷投入资本，衡量资本投入创造经营回报的效率。',capital_expenditure:'购建固定资产、无形资产和其他长期资产支付的现金，单位亿元。',interest_debt_ratio:'有息负债÷总资产，反映债务融资压力。',interest_coverage:'息税前利润÷利息费用，衡量偿付利息的能力。',debt_ratio:'负债合计÷资产合计。',dividend_yield:'完整年度沿用同花顺税前分红率；最新报告期按最近365天已实施每股现金分红合计÷同花顺最新收盘价。',dynamic_pe:'同花顺动态市盈率原始值：总市值÷按最新报告期推算的全年净利润。',total_return_cagr:'以后复权月线首末收盘价计算，近似反映现金分红和送转再投资后的上市以来复合年化总回报。',historical_total_return:'以后复权期末值÷期初值－1，反映上市以来含现金分红和送转影响的累计总回报。'};const info=k=>`<span class="info" title="${help[k]||''}" onclick="event.stopPropagation();showMetricInfo('${k}')">?</span>`;const formulas={revenue:'财务报表营业总收入',revenue_growth:'本期营业总收入÷上年同期营业总收入－1',net_profit:'归属于母公司股东的净利润',net_profit_growth:'本期归母净利润÷上年同期归母净利润－1',deducted_profit:'归母净利润－非经常性损益',gross_margin:'（营业收入－营业成本）÷营业收入',net_margin:'净利润÷营业总收入',roe:'净利润÷平均净资产',operating_cash_flow:'经营活动现金流量净额÷期末总股本',receivable_days:'报告期天数÷应收账款周转率',contract_liability:'资产负债表合同负债',contract_liability_growth:'本期合同负债÷上年同期合同负债－1',ocf_to_profit:'经营活动现金流量净额÷归母净利润',free_cash_flow:'经营活动现金流量净额－购建长期资产支付的现金',roic:'税后营业利润÷（股东权益＋有息负债－货币资金）',capital_expenditure:'购建固定资产、无形资产及其他长期资产支付的现金',interest_debt_ratio:'（短期借款＋长期借款＋应付债券＋一年内到期非流动负债）÷总资产',interest_coverage:'（利润总额＋利息费用）÷利息费用',enterprise_value:'报告期股价×总股本＋有息负债－货币资金',dcf_per_share:'未来5年每股现金流现值＋终值现值',debt_ratio:'负债合计÷资产合计',dividend_yield:'近365天已实施每股现金分红合计÷最新收盘价'};const interpretations={revenue:'观察公司经营规模及需求变化，需结合增速和现金流判断质量。',revenue_growth:'持续为正表示规模扩张；需关注是否依赖降价、赊销或并购。',net_profit:'反映股东最终获得的经营成果，应结合扣非利润与现金流验证。',net_profit_growth:'高于收入增速可能来自利润率提升；长期低于收入增速表示盈利承压。',deducted_profit:'更接近主营业务盈利能力，可剔除资产处置、补贴等一次性因素。',gross_margin:'体现产品定价权和成本控制；持续下降可能意味着竞争或成本压力。',net_margin:'反映每单位收入最终形成多少利润。',roe:'衡量股东资本回报；需结合负债水平判断高ROE是否依赖杠杆。',operating_cash_flow:'衡量每股对应的经营现金创造能力。',receivable_days:'通常越短回款越快；持续上升可能意味着客户质量或收入确认风险。',contract_liability:'常用于观察客户预付款和未来收入储备，但并非所有行业都适用。',contract_liability_growth:'快于收入增长通常说明订单或预收改善，下降可能意味着需求或渠道备货走弱。',ocf_to_profit:'长期接近或高于100%通常说明利润含金量较好。',free_cash_flow:'持续为正代表经营现金可以覆盖长期投资，并支持还债、分红或回购。',roic:'长期高于资本成本才真正创造企业价值。',capital_expenditure:'反映扩产和长期资产投入，需要结合未来收入及ROIC评价效果。',interest_debt_ratio:'越高代表利率及再融资风险越大，不同行业合理水平差异明显。',interest_coverage:'数值越高偿息能力越强；接近1意味着经营利润仅勉强覆盖利息。',enterprise_value:'用于跨资本结构比较企业整体经营资产价值。',dcf_per_share:'理论内在价值，对增速、折现率和永续增长率非常敏感。',debt_ratio:'反映总资产中由负债融资的比例。',dividend_yield:'反映现金分红相对当前股价的收益水平，需判断分红是否由自由现金流覆盖。'};function showMetricInfo(k){const m=meta[k]||[k,''];$('#metricModalTitle').textContent=m[0];$('#metricModalBody').innerHTML=`<div class="modal-row"><span>定义</span><span>${esc(help[k]||'暂无说明')}</span></div><div class="modal-row"><span>公式</span><span>${esc(formulas[k]||'直接取自财务报表或公开行情')}</span></div><div class="modal-row"><span>单位</span><span>${esc(m[1]||'—')}</span></div><div class="modal-row"><span>解读</span><span>${esc(interpretations[k]||'需结合行业、历史趋势和其他财务指标综合判断。')}</span></div>`;$('#metricModal').classList.remove('hidden')}function closeMetricInfo(){$('#metricModal').classList.add('hidden')}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMetricInfo()});
+function status(t,bad=false){$('#status').textContent=t;$('#status').style.color=bad?'var(--red)':'var(--muted)'}function fmt(v,k){if(v==null)return'—';return (['revenue_growth','net_profit_growth','gross_margin','net_margin','roe','contract_liability_growth','ocf_to_profit','roic','interest_debt_ratio','debt_ratio','dividend_yield'].includes(k)?(v*100).toFixed(2):Number(v).toFixed(2))+meta[k][1]}
 async function api(url,opt){const r=await fetch(url,opt);const x=await r.json();if(!r.ok)throw Error(x.error||'请求失败');return x}
 async function refreshLists(){const [f,c]=await Promise.all([api('/api/favorites'),api('/api/cached')]);$('#favorites').innerHTML=f.length?f.map(x=>`<div class="listrow"><button class="fav" onclick="loadStock('${x.code}')"><span>${x.name||x.code}</span><small>${x.code}</small></button><button class="remove" title="移除收藏" onclick="removeFavorite('${x.code}')">×</button></div>`).join(''):'<div class="empty">暂无收藏</div>';$('#cached').innerHTML=c.length?c.map(x=>`<div class="listrow"><button class="fav" onclick="loadStock('${x.code}')"><span>${x.name||x.code}</span><small>${x.code}</small></button><button class="remove" title="删除本地缓存" onclick="removeCache('${x.code}')">×</button></div>`).join(''):'<div class="empty">暂无缓存</div>'}
 async function removeFavorite(code){if(!confirm('移除该收藏股票？'))return;try{await api('/api/favorites/'+code,{method:'DELETE'});if(current?.code===code){current.is_favorite=false;$('#favoriteBtn').textContent='收藏'}await refreshLists();status('已移除收藏。')}catch(e){status(e.message,true)}}
@@ -59,7 +61,7 @@ function renderChart(){
  let min=pts.length?Math.min(...pts.map(p=>p.v)):0,max=pts.length?Math.max(...pts.map(p=>p.v)):1,pmin=pricePts.length?Math.min(...pricePts.map(p=>p.v)):0,pmax=pricePts.length?Math.max(...pricePts.map(p=>p.v)):1;
  if(max===min){max+=1;min-=1}if(pmax===pmin){pmax+=1;pmin=Math.max(0,pmin-1)}
  const x=i=>65+i*(870/Math.max(1,vals.length-1)),y=v=>285-(v-min)*(240/(max-min)),py=v=>285-(v-pmin)*(240/(pmax-pmin));
- const isPct=['revenue_growth','net_profit_growth','gross_margin','net_margin','roe','debt_ratio','dividend_yield'].includes(metric);let h='';
+ const isPct=['revenue_growth','net_profit_growth','gross_margin','net_margin','roe','contract_liability_growth','ocf_to_profit','roic','interest_debt_ratio','debt_ratio','dividend_yield'].includes(metric);let h='';
  for(let i=0;i<5;i++){let yy=45+i*60,val=max-(max-min)*i/4,pval=pmax-(pmax-pmin)*i/4;h+=`<line class="grid" x1="65" y1="${yy}" x2="935" y2="${yy}"/><text class="chart-label" x="57" y="${yy+4}" text-anchor="end">${(isPct?val*100:val).toFixed(1)}</text><text x="943" y="${yy+4}" fill="var(--amber)" font-size="11">${pval.toFixed(2)}</text>`}
  h+=`<line class="axis" x1="65" y1="285" x2="935" y2="285"/><text class="chart-label" x="65" y="18">${meta[metric][0]}（${meta[metric][1]}）</text><text x="935" y="18" text-anchor="end" fill="var(--amber)" font-size="11">不复权收盘价（元）</text>`;
  const drawSegments=(series,yfn,cls)=>{let parts=[],seg=[];series.forEach((v,i)=>{if(v==null){if(seg.length)parts.push(seg),seg=[]}else seg.push(`${x(i)},${yfn(Number(v))}`)});if(seg.length)parts.push(seg);parts.forEach(p=>h+=`<polyline class="${cls}" points="${p.join(' ')}"/>`)};
@@ -90,8 +92,8 @@ function renderForecast(){
  box.innerHTML=`<div class="toolbar"><strong>未来5年股价预测</strong><span class="legend">${legend}</span></div><svg id="forecastSvg" viewBox="0 0 1000 340" preserveAspectRatio="none" style="width:100%;height:285px;display:block"></svg><div class="forecast-summary">${esc(fc.method)}<br>基准EPS ${fc.current_eps}元 · 近5年净利润CAGR ${fc.base_cagr}% · 最新实际不复权股价 ${f2(actual)}元<br>${esc(assumptions)}<br><span style="color:var(--red)">${esc(fc.disclaimer)}</span></div><div class="holder-wrap"><table class="forecast-table"><thead><tr><th>年度</th>${methodKeys.map(k=>`<th>${methods[k]?.name||k}</th>`).join('')}<th>综合区间</th><th>综合中位</th></tr></thead><tbody>${rows}</tbody></table></div>`;
  const svg=$('#forecastSvg');if(svg)svg.innerHTML=h
 }
-function renderTable(){const ks=Object.keys(meta);let h='<thead><tr><th>报告期</th>'+ks.map(k=>`<th>${meta[k][0]}</th>`).join('')+'</tr></thead><tbody>';for(let i=current.years.length-1;i>=0;i--)h+='<tr><td>'+current.years[i]+'</td>'+ks.map(k=>`<td>${fmt(current.metrics[k][i],k)}</td>`).join('')+'</tr>';$('#table').innerHTML=h+'</tbody>'}
-$('#refresh').onclick=()=>current&&loadStock(current.code,true);$('#favoriteBtn').onclick=async()=>{if(!current)return;try{await api('/api/favorites/'+current.code,{method:current.is_favorite?'DELETE':'POST'});current.is_favorite=!current.is_favorite;render();refreshLists()}catch(e){status(e.message,true)}};refreshLists();
+function renderTable(){const ks=Object.keys(meta);let h='<thead><tr><th>报告期</th>'+ks.map(k=>`<th class="metric-head" data-metric="${k}" title="点击查看指标含义">${meta[k][0]} <span class="info">?</span></th>`).join('')+'</tr></thead><tbody>';for(let i=current.years.length-1;i>=0;i--)h+='<tr><td>'+current.years[i]+'</td>'+ks.map(k=>`<td>${fmt(current.metrics[k]?.[i],k)}</td>`).join('')+'</tr>';$('#table').innerHTML=h+'</tbody>';$('#table').querySelectorAll('th.metric-head').forEach(th=>th.addEventListener('click',()=>showMetricInfo(th.dataset.metric)))}
+$('#refresh').onclick=()=>current&&loadStock(current.code,true);$('#exportBtn').onclick=()=>{if(!current){status('请先选择股票。',true);return}status('正在生成Excel，请稍候…');window.location.href='/api/export/'+current.code;setTimeout(()=>status('Excel已生成并开始下载。'),1200)};$('#favoriteBtn').onclick=async()=>{if(!current)return;try{await api('/api/favorites/'+current.code,{method:current.is_favorite?'DELETE':'POST'});current.is_favorite=!current.is_favorite;render();refreshLists()}catch(e){status(e.message,true)}};refreshLists();
 </script></body></html>'''
 
 
@@ -585,6 +587,134 @@ def build_price_forecast(financials):
     return forecast
 
 
+def supplementary_valuation_metrics(code, report_dates, prices, financials):
+    """计算历史企业价值EV及最新报告期简化DCF每股价值。金额单位为亿元。"""
+    raw = json.loads(fetch(THS_API.format(code=code, kind="debt")))
+    debt_data = json.loads(raw.get("flashData") or "{}")
+    dates = (debt_data.get("report") or [[]])[0]
+    titles = [x[0] if isinstance(x, list) else x for x in (debt_data.get("title") or [])[1:]]
+    rows = (debt_data.get("report") or [])[1:]
+    table = {title: rows[i] for i, title in enumerate(titles) if i < len(rows)}
+    def series(key):
+        row = table.get(key, [])
+        result = []
+        for d in report_dates:
+            try: result.append(parse_number(row[dates.index(d)]))
+            except (ValueError, IndexError): result.append(None)
+        return result
+    cash = series("货币资金")
+    short_debt = series("短期借款")
+    long_debt = series("长期借款")
+    bonds = series("应付债券")
+    current_due = series("一年内到期的非流动负债")
+    share_capital = series("实收资本（或股本）")
+    ev = []
+    for i, price in enumerate(prices):
+        shares = share_capital[i] if i < len(share_capital) else None
+        if price is None or shares is None:
+            ev.append(None); continue
+        debt = sum(x or 0 for x in (short_debt[i], long_debt[i], bonds[i], current_due[i]))
+        ev.append(round(price * shares + debt - (cash[i] or 0), 2))
+
+    # 简化DCF：以最新完整年报EPS为现金流代理，按中性增速预测5年并计算终值。
+    forecast = financials.get("price_forecast") or {}
+    base_eps = forecast.get("current_eps")
+    neutral = ((forecast.get("scenarios") or {}).get("neutral") or {})
+    growth = (neutral.get("growth") or 0) / 100
+    discount_rate, terminal_growth = 0.10, 0.03
+    dcf_value = None
+    if base_eps is not None and discount_rate > terminal_growth:
+        cashflow = base_eps
+        pv = 0.0
+        for year in range(1, 6):
+            cashflow *= 1 + growth
+            pv += cashflow / ((1 + discount_rate) ** year)
+        terminal = cashflow * (1 + terminal_growth) / (discount_rate - terminal_growth)
+        pv += terminal / ((1 + discount_rate) ** 5)
+        dcf_value = round(pv, 2) if math.isfinite(pv) else None
+    dcf_series = [None] * len(report_dates)
+    if dcf_series: dcf_series[-1] = dcf_value
+    return ev, dcf_series, {
+        "ev": "报告期总市值 + 短期借款 + 长期借款 + 应付债券 + 一年内到期非流动负债 - 货币资金",
+        "dcf_per_share": f"最新完整年报EPS为现金流代理，未来5年按中性增速{growth*100:.2f}%预测，折现率10%，永续增长率3%"
+    }
+
+
+def operational_forward_metrics(code, report_dates):
+    """从三大报表计算前瞻经营质量指标，金额单位亿元。"""
+    def load_kind(kind):
+        outer = json.loads(fetch(THS_API.format(code=code, kind=kind)))
+        return json.loads(outer.get("flashData") or "{}")
+    datasets = {k: load_kind(k) for k in ("debt", "benefit", "cash")}
+    def make_table(dataset):
+        dates = (dataset.get("report") or [[]])[0]
+        titles = [x[0] if isinstance(x, list) else x for x in (dataset.get("title") or [])[1:]]
+        rows = (dataset.get("report") or [])[1:]
+        return dates, {t: rows[i] for i, t in enumerate(titles) if i < len(rows)}
+    tables = {k: make_table(v) for k, v in datasets.items()}
+    def aligned(kind, key):
+        dates, table = tables[kind]; row = table.get(key, [])
+        out=[]
+        for d in report_dates:
+            try: out.append(parse_number(row[dates.index(d)]))
+            except (ValueError, IndexError): out.append(None)
+        return out
+    def yoy_from_raw(kind, key):
+        dates, table = tables[kind]; row = table.get(key, []); out=[]
+        for d in report_dates:
+            prev = str(int(d[:4])-1)+d[4:]
+            try:
+                cur, old = parse_number(row[dates.index(d)]), parse_number(row[dates.index(prev)])
+                out.append((cur / old - 1) if cur is not None and old not in (None,0) else None)
+            except (ValueError, IndexError): out.append(None)
+        return out
+
+    contract = aligned("debt", "合同负债")
+    contract_growth = yoy_from_raw("debt", "合同负债")
+    cash_balance = aligned("debt", "货币资金")
+    assets = aligned("debt", "资产合计")
+    equity = aligned("debt", "所有者权益（或股东权益）合计")
+    short_debt = aligned("debt", "短期借款")
+    long_debt = aligned("debt", "长期借款")
+    bonds = aligned("debt", "应付债券")
+    current_due = aligned("debt", "一年内到期的非流动负债")
+    operating_profit = aligned("benefit", "三、营业利润")
+    total_profit = aligned("benefit", "四、利润总额")
+    income_tax = aligned("benefit", "减：所得税费用")
+    interest_expense = aligned("benefit", "其中：利息费用")
+    net_profit = aligned("benefit", "归属于母公司所有者的净利润")
+    ocf = aligned("cash", "经营活动产生的现金流量净额")
+    capex = aligned("cash", "购建固定资产、无形资产和其他长期资产支付的现金")
+
+    result = {"contract_liability": contract, "contract_liability_growth": contract_growth,
+              "capital_expenditure": capex}
+    for key in ("ocf_to_profit", "free_cash_flow", "roic", "interest_debt_ratio", "interest_coverage"):
+        result[key] = []
+    for i in range(len(report_dates)):
+        debt = sum(x or 0 for x in (short_debt[i], long_debt[i], bonds[i], current_due[i]))
+        result["ocf_to_profit"].append((ocf[i] / net_profit[i]) if ocf[i] is not None and net_profit[i] not in (None,0) else None)
+        result["free_cash_flow"].append(round(ocf[i] - capex[i], 2) if ocf[i] is not None and capex[i] is not None else None)
+        tax_rate = (income_tax[i] / total_profit[i]) if income_tax[i] is not None and total_profit[i] not in (None,0) else 0.25
+        tax_rate = max(0, min(0.5, tax_rate))
+        invested = (equity[i] or 0) + debt - (cash_balance[i] or 0)
+        nopat = operating_profit[i] * (1-tax_rate) if operating_profit[i] is not None else None
+        result["roic"].append((nopat / invested) if nopat is not None and invested > 0 else None)
+        result["interest_debt_ratio"].append((debt / assets[i]) if assets[i] not in (None,0) else None)
+        ebit = (total_profit[i] + interest_expense[i]) if total_profit[i] is not None and interest_expense[i] is not None else None
+        result["interest_coverage"].append((ebit / interest_expense[i]) if ebit is not None and interest_expense[i] not in (None,0) else None)
+    notes = {
+        "contract_liability": "资产负债表合同负债，单位亿元",
+        "contract_liability_growth": "合同负债较上年同期增长率",
+        "ocf_to_profit": "经营活动现金流量净额÷归母净利润",
+        "free_cash_flow": "经营活动现金流量净额－购建长期资产支付的现金，单位亿元",
+        "roic": "税后营业利润÷（股东权益＋有息负债－货币资金）",
+        "capital_expenditure": "购建固定资产、无形资产和其他长期资产支付的现金，单位亿元",
+        "interest_debt_ratio": "（短期借款＋长期借款＋应付债券＋一年内到期非流动负债）÷总资产",
+        "interest_coverage": "（利润总额＋利息费用）÷利息费用"
+    }
+    return result, notes
+
+
 def report_series(data):
     dates = data["report"][0]
     annual = [(d, i) for i, d in enumerate(dates) if re.fullmatch(r"\d{4}-12-31", str(d))]
@@ -613,7 +743,7 @@ def get_financials(code, force=False):
         if row:
             cached = dict(row)
     cached_payload = json.loads(cached["payload"]) if cached else None
-    cache_current = cached_payload and cached_payload.get("schema_version") == 11
+    cache_current = cached_payload and cached_payload.get("schema_version") == 14
     if cache_current and not force:
         payload = cached_payload
         payload.update(from_cache=True, updated_at=cached["updated_at"])
@@ -625,7 +755,7 @@ def get_financials(code, force=False):
                 "revenue": "营业总收入", "revenue_growth": "营业总收入同比增长率",
                 "net_profit": "净利润", "net_profit_growth": "净利润同比增长率", "deducted_profit": "扣非净利润",
                 "gross_margin": "销售毛利率", "net_margin": "销售净利率", "roe": "净资产收益率",
-                "operating_cash_flow": "每股经营现金流", "debt_ratio": "资产负债率"
+                "operating_cash_flow": "每股经营现金流", "receivable_days": "应收账款周转天数", "debt_ratio": "资产负债率"
             }
             metrics = {k: m.get(v, [None] * len(periods)) for k, v in keys.items()}
             old_payload = json.loads(cached["payload"]) if cached else {}
@@ -652,7 +782,7 @@ def get_financials(code, force=False):
                 report_prices = old_payload.get("report_prices", [None] * len(periods))
                 price_dates = old_payload.get("price_dates", [None] * len(periods))
             # 独立行情接口单项失败时沿用已有缓存，不清空有效历史数据。
-            interim_payload = {"schema_version": 11, "code": code, "name": name, "years": periods, "report_dates": report_dates, "metrics": metrics,
+            interim_payload = {"schema_version": 14, "code": code, "name": name, "years": periods, "report_dates": report_dates, "metrics": metrics,
                        "report_prices": report_prices, "price_dates": price_dates,
                        "latest_price": latest_price, "quote_time": quote_time, "dynamic_pe": latest_dynamic_pe,
                        "total_return_cagr": cagr, "historical_total_return": cumulative_return, "total_return_period": [cagr_start, cagr_end],
@@ -666,6 +796,21 @@ def get_financials(code, force=False):
                 if forecast: interim_payload["price_forecast"] = forecast
             except Exception:
                 pass
+            try:
+                ev_series, dcf_series, valuation_notes = supplementary_valuation_metrics(code, report_dates, report_prices, interim_payload)
+                metrics["enterprise_value"] = ev_series
+                metrics["dcf_per_share"] = dcf_series
+                interim_payload["metric_notes"].update(valuation_notes)
+            except Exception:
+                metrics["enterprise_value"] = old_payload.get("metrics", {}).get("enterprise_value", [None] * len(periods))
+                metrics["dcf_per_share"] = old_payload.get("metrics", {}).get("dcf_per_share", [None] * len(periods))
+            try:
+                forward_metrics, forward_notes = operational_forward_metrics(code, report_dates)
+                metrics.update(forward_metrics)
+                interim_payload["metric_notes"].update(forward_notes)
+            except Exception:
+                for key in ("contract_liability", "contract_liability_growth", "ocf_to_profit", "free_cash_flow", "roic", "capital_expenditure", "interest_debt_ratio", "interest_coverage"):
+                    metrics[key] = old_payload.get("metrics", {}).get(key, [None] * len(periods))
             payload = interim_payload
             now = datetime.now().strftime("%Y-%m-%d %H:%M")
             with DB_LOCK, db_conn() as con:
@@ -679,6 +824,197 @@ def get_financials(code, force=False):
     with DB_LOCK, db_conn() as con:
         payload["is_favorite"] = bool(con.execute("SELECT 1 FROM favorites WHERE code=?", (code,)).fetchone())
     return payload
+
+
+def generate_excel_export(code):
+    """生成当前股票完整Excel工作簿，返回(xlsx字节, 文件名)。"""
+    from openpyxl import Workbook
+    from openpyxl.chart import LineChart, Reference
+    from openpyxl.chart.axis import ChartLines
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter
+
+    data = get_financials(code, False)
+    try:
+        profile = get_company_profile(code, False)
+    except Exception:
+        profile = {}
+    wb = Workbook()
+    wb.remove(wb.active)
+    bg, panel, panel2, line = "07111F", "0E1B2D", "13243B", "263A55"
+    text, muted, cyan, amber, green, red, purple = "EDF4FF", "8FA5C2", "64DFDF", "FFC857", "65D6A6", "FF7A90", "B794F4"
+    thin = Side(style="thin", color=line)
+
+    def setup(ws, title, subtitle=""):
+        ws.sheet_view.showGridLines = False
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+        ws.page_setup.fitToWidth = 1
+        ws.sheet_properties.outlinePr.summaryBelow = True
+        ws.freeze_panes = "A5"
+        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=12)
+        ws["A1"] = title
+        ws["A1"].font = Font(name="Arial", size=18, bold=True, color=text)
+        ws["A1"].fill = PatternFill("solid", fgColor=bg)
+        ws["A1"].alignment = Alignment(vertical="center")
+        ws.row_dimensions[1].height = 30
+        if subtitle:
+            ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=12)
+            ws["A2"] = subtitle
+            ws["A2"].font = Font(name="Arial", size=10, color=muted)
+            ws["A2"].fill = PatternFill("solid", fgColor=bg)
+        for row in ws.iter_rows(min_row=1, max_row=max(2, ws.max_row), min_col=1, max_col=12):
+            for c in row:
+                c.font = Font(name="Arial", size=c.font.sz or 10, bold=c.font.bold, color=c.font.color)
+        ws.sheet_properties.tabColor = cyan
+
+    def header(cell):
+        cell.font = Font(name="Arial", bold=True, color=text)
+        cell.fill = PatternFill("solid", fgColor=panel2)
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.border = Border(bottom=thin)
+
+    def value_style(cell, pct=False):
+        cell.font = Font(name="Arial", color=text)
+        cell.fill = PatternFill("solid", fgColor=panel)
+        cell.border = Border(bottom=thin)
+        cell.alignment = Alignment(horizontal="right", vertical="center")
+        if pct: cell.number_format = "0.00%;(0.00%);-"
+        elif isinstance(cell.value, (int, float)): cell.number_format = "#,##0.00;(#,##0.00);-"
+
+    periods = data.get("years", [])
+    metrics = data.get("metrics", {})
+    metric_defs = [
+        ("revenue", "营业总收入", "亿元", False), ("revenue_growth", "营业收入增速", "%", True),
+        ("net_profit", "归母净利润", "亿元", False), ("net_profit_growth", "净利润增速", "%", True),
+        ("deducted_profit", "扣非净利润", "亿元", False), ("gross_margin", "销售毛利率", "%", True),
+        ("net_margin", "销售净利率", "%", True), ("roe", "净资产收益率", "%", True),
+        ("operating_cash_flow", "每股经营现金流", "元/股", False), ("receivable_days", "应收账款回款天数", "天", False),
+        ("contract_liability", "合同负债", "亿元", False), ("contract_liability_growth", "合同负债增速", "%", True),
+        ("ocf_to_profit", "经营现金流/净利润", "%", True), ("free_cash_flow", "自由现金流", "亿元", False),
+        ("roic", "ROIC", "%", True), ("capital_expenditure", "资本开支", "亿元", False),
+        ("interest_debt_ratio", "有息负债率", "%", True), ("interest_coverage", "利息保障倍数", "倍", False),
+        ("enterprise_value", "企业价值EV", "亿元", False), ("dcf_per_share", "未来现金流折现", "元/股", False), ("debt_ratio", "资产负债率", "%", True),
+        ("dividend_yield", "股息率（最新期TTM）", "%", True),
+    ]
+
+    # 仪表盘
+    ws = wb.create_sheet("仪表盘")
+    setup(ws, f"{data.get('name', code)}（{code}）财务仪表盘", f"导出时间：{datetime.now():%Y-%m-%d %H:%M}｜数据来源：同花顺F10及公开行情")
+    latest = len(periods) - 1
+    cards = [
+        ("营业总收入", metrics.get("revenue", [None])[-1], "亿元", False),
+        ("营业收入增速", metrics.get("revenue_growth", [None])[-1], "%", True),
+        ("归母净利润", metrics.get("net_profit", [None])[-1], "亿元", False),
+        ("净利润增速", metrics.get("net_profit_growth", [None])[-1], "%", True),
+        ("销售毛利率", metrics.get("gross_margin", [None])[-1], "%", True),
+        ("净资产收益率", metrics.get("roe", [None])[-1], "%", True),
+        ("股息率TTM", metrics.get("dividend_yield", [None])[-1], "%", True),
+        ("动态市盈率", data.get("dynamic_pe"), "倍", False),
+        ("复合年化总收益率", data.get("total_return_cagr"), "%", True),
+        ("历史累计总收益率", data.get("historical_total_return"), "%", True),
+    ]
+    for i, (label, val, unit, is_pct) in enumerate(cards):
+        col = 1 + (i % 5) * 2; row = 4 + (i // 5) * 4
+        ws.merge_cells(start_row=row, start_column=col, end_row=row, end_column=col+1)
+        ws.merge_cells(start_row=row+1, start_column=col, end_row=row+1, end_column=col+1)
+        ws.merge_cells(start_row=row+2, start_column=col, end_row=row+2, end_column=col+1)
+        ws.cell(row, col, label); ws.cell(row, col).font = Font(name="Arial", size=10, color=muted)
+        ws.cell(row, col).fill = PatternFill("solid", fgColor=panel)
+        ws.cell(row, col).alignment = Alignment(horizontal="center")
+        c = ws.cell(row+1, col, val)
+        c.font = Font(name="Arial", size=17, bold=True, color=text); c.fill = PatternFill("solid", fgColor=panel)
+        c.alignment = Alignment(horizontal="center", vertical="center")
+        if is_pct: c.number_format = "0.00%"
+        elif isinstance(val, (int,float)): c.number_format = "#,##0.00"
+        ws.cell(row+2, col).fill = PatternFill("solid", fgColor=panel)
+        ws.cell(row+2, col, f"{periods[latest] if latest >= 0 else '最新'} · {unit}")
+        ws.cell(row+2, col).font = Font(name="Arial", size=9, color=muted)
+        ws.cell(row+2, col).alignment = Alignment(horizontal="center")
+    for c in range(1, 11): ws.column_dimensions[get_column_letter(c)].width = 15
+    # 仪表盘趋势数据与主图
+    start = 13
+    ws.cell(start, 1, "报告期"); ws.cell(start, 2, "营业总收入"); ws.cell(start, 3, "归母净利润"); ws.cell(start, 4, "不复权收盘价")
+    for c in range(1,5): header(ws.cell(start,c))
+    for i,p in enumerate(periods, start+1):
+        ws.cell(i,1,p); ws.cell(i,2,(metrics.get("revenue") or [None]*len(periods))[i-start-1]); ws.cell(i,3,(metrics.get("net_profit") or [None]*len(periods))[i-start-1]); ws.cell(i,4,(data.get("report_prices") or [None]*len(periods))[i-start-1])
+        for c in range(1,5): value_style(ws.cell(i,c))
+    chart = LineChart(); chart.title = "营业收入、归母净利润与不复权股价趋势"; chart.y_axis.title = "财务指标（亿元）"; chart.x_axis.title = "报告期"; chart.height=9; chart.width=22
+    chart.add_data(Reference(ws,min_col=2,max_col=3,min_row=start,max_row=start+len(periods)),titles_from_data=True)
+    chart.set_categories(Reference(ws,min_col=1,min_row=start+1,max_row=start+len(periods)))
+    chart2 = LineChart(); chart2.y_axis.axId=200; chart2.y_axis.title="股价（元）"; chart2.y_axis.crosses="max"; chart2.add_data(Reference(ws,min_col=4,min_row=start,max_row=start+len(periods)),titles_from_data=True)
+    chart += chart2; ws.add_chart(chart,"F13")
+
+    # 财务明细
+    ws = wb.create_sheet("财务明细"); setup(ws, f"{data.get('name',code)} 财务指标明细", "最近30个完整年度 + 最新报告期")
+    heads = ["报告期"] + [x[1] + (f"（{x[2]}）" if x[2] else "") for x in metric_defs] + ["不复权收盘价（元）","价格日期"]
+    for j,h in enumerate(heads,1): ws.cell(4,j,h); header(ws.cell(4,j)); ws.column_dimensions[get_column_letter(j)].width = 16 if j>1 else 14
+    for i,p in enumerate(periods,5):
+        ws.cell(i,1,p); value_style(ws.cell(i,1))
+        for j,(key,_,_,pct) in enumerate(metric_defs,2): ws.cell(i,j,(metrics.get(key) or [None]*len(periods))[i-5]); value_style(ws.cell(i,j),pct)
+        j=len(metric_defs)+2; ws.cell(i,j,(data.get("report_prices") or [None]*len(periods))[i-5]); value_style(ws.cell(i,j)); ws.cell(i,j+1,(data.get("price_dates") or [None]*len(periods))[i-5]); value_style(ws.cell(i,j+1))
+    ws.auto_filter.ref=f"A4:{get_column_letter(len(heads))}{4+len(periods)}"; ws.freeze_panes="B5"
+
+    # 全部趋势图
+    ws = wb.create_sheet("全部趋势图"); setup(ws, f"{data.get('name',code)} 全部指标趋势", "青色：财务指标｜黄色：不复权收盘价")
+    row=4
+    for idx,(key,label,unit,pct) in enumerate(metric_defs):
+        ws.cell(row,1,"报告期"); ws.cell(row,2,label); ws.cell(row,3,"不复权收盘价")
+        for c in range(1,4): header(ws.cell(row,c))
+        for i,p in enumerate(periods,row+1):
+            ws.cell(i,1,p); ws.cell(i,2,(metrics.get(key) or [None]*len(periods))[i-row-1]); ws.cell(i,3,(data.get("report_prices") or [None]*len(periods))[i-row-1])
+            value_style(ws.cell(i,1)); value_style(ws.cell(i,2),pct); value_style(ws.cell(i,3))
+        ch=LineChart(); ch.title=f"{label} 与股价"; ch.y_axis.title=f"{label}（{unit}）"; ch.height=7; ch.width=17; ch.add_data(Reference(ws,min_col=2,min_row=row,max_row=row+len(periods)),titles_from_data=True); ch.set_categories(Reference(ws,min_col=1,min_row=row+1,max_row=row+len(periods)))
+        ch2=LineChart(); ch2.y_axis.axId=200+idx; ch2.y_axis.title="不复权股价（元）"; ch2.y_axis.crosses="max"; ch2.add_data(Reference(ws,min_col=3,min_row=row,max_row=row+len(periods)),titles_from_data=True); ch+=ch2
+        anchor_col=5+(idx%2)*9; anchor_row=4+(idx//2)*16; ws.add_chart(ch,f"{get_column_letter(anchor_col)}{anchor_row}")
+        row += len(periods)+3
+    for c,w in {"A":14,"B":18,"C":18}.items(): ws.column_dimensions[c].width=w
+
+    # 股价预测
+    ws = wb.create_sheet("股价预测"); setup(ws, f"{data.get('name',code)} 未来5年股价预测", "PE、PEG、股息率、DCF、历史趋势五种方法｜不复权股价口径")
+    fc=data.get("price_forecast") or {}; years=fc.get("years") or []; methods=fc.get("methods") or {}; keys=["pe","peg","dividend","dcf","trend"]
+    heads=["年度"]+[methods.get(k,{}).get("name",k) for k in keys]+["综合低值","综合高值","综合中位"]
+    for j,h in enumerate(heads,1): ws.cell(4,j,h); header(ws.cell(4,j)); ws.column_dimensions[get_column_letter(j)].width=18
+    for i,yr in enumerate(years,5):
+        ws.cell(i,1,yr); value_style(ws.cell(i,1))
+        for j,k in enumerate(keys,2): ws.cell(i,j,((methods.get(k) or {}).get("prices") or [None]*len(years))[i-5]); value_style(ws.cell(i,j))
+        comp=(fc.get("composite") or [{}]*len(years))[i-5]; ws.cell(i,7,comp.get("low")); ws.cell(i,8,comp.get("high")); ws.cell(i,9,comp.get("median")); [value_style(ws.cell(i,c)) for c in range(7,10)]
+    if years:
+        ch=LineChart(); ch.title="五种方法股价预测"; ch.y_axis.title="预测股价（元）"; ch.height=10; ch.width=22; ch.add_data(Reference(ws,min_col=2,max_col=6,min_row=4,max_row=4+len(years)),titles_from_data=True); ch.set_categories(Reference(ws,min_col=1,min_row=5,max_row=4+len(years))); ws.add_chart(ch,"A12")
+    r=6+len(years); ws.cell(r,1,"预测方法与假设"); header(ws.cell(r,1)); ws.merge_cells(start_row=r,start_column=1,end_row=r,end_column=9)
+    for k in keys:
+        r+=1; ws.merge_cells(start_row=r,start_column=1,end_row=r,end_column=9); ws.cell(r,1,f"{methods.get(k,{}).get('name',k)}：{methods.get(k,{}).get('assumption','')}"); ws.cell(r,1).font=Font(name="Arial",color=muted); ws.cell(r,1).alignment=Alignment(wrap_text=True)
+    r+=1; ws.merge_cells(start_row=r,start_column=1,end_row=r,end_column=9); ws.cell(r,1,fc.get("disclaimer","")); ws.cell(r,1).font=Font(name="Arial",color=red,italic=True); ws.cell(r,1).alignment=Alignment(wrap_text=True)
+
+    # 公司分析
+    ws = wb.create_sheet("公司分析"); setup(ws, f"{data.get('name',code)} 公司与经营分析", f"分析期：{profile.get('analysis_period','最新')}｜资料更新：{profile.get('updated_at','')}")
+    sections=[("公司简介",profile.get("summary")),("主营业务",profile.get("business")),("主要产品/业务类别",profile.get("products")),("注册地址",profile.get("registered_address")),("办公地址",profile.get("office_address")),("所属地区/官网",f"{profile.get('region','')} · {profile.get('website','')}"),("经营现状",profile.get("current_status")),("未来发展前景",profile.get("outlook")),("主要风险",profile.get("risks")),("分析说明",profile.get("analysis_note"))]
+    row=4
+    for title,body in sections:
+        ws.merge_cells(start_row=row,start_column=1,end_row=row,end_column=2); ws.cell(row,1,title); header(ws.cell(row,1)); row+=1
+        ws.merge_cells(start_row=row,start_column=1,end_row=row+1,end_column=12); ws.cell(row,1,body or "暂无"); ws.cell(row,1).font=Font(name="Arial",color=text); ws.cell(row,1).fill=PatternFill("solid",fgColor=panel); ws.cell(row,1).alignment=Alignment(wrap_text=True,vertical="top"); ws.row_dimensions[row].height=36; row+=3
+    for c in range(1,13): ws.column_dimensions[get_column_letter(c)].width=13
+
+    # 十大股东
+    ws=wb.create_sheet("十大股东"); setup(ws,f"{data.get('name',code)} 最新十大股东",f"报告期：{profile.get('shareholder_period','')}｜{profile.get('shareholder_summary','')}")
+    heads=["排名","股东名称","持股数量","持股比例","持股变化","变动比例","股份类型"]
+    for j,h in enumerate(heads,1): ws.cell(4,j,h); header(ws.cell(4,j))
+    ws.column_dimensions["A"].width=8; ws.column_dimensions["B"].width=55
+    for c in range(3,8): ws.column_dimensions[get_column_letter(c)].width=17
+    for i,h in enumerate(profile.get("top_shareholders") or [],5):
+        vals=[i-4,h.get("name"),h.get("shares"),h.get("ratio"),h.get("change"),h.get("change_ratio"),h.get("share_type")]
+        for j,v in enumerate(vals,1): ws.cell(i,j,v); value_style(ws.cell(i,j)); ws.cell(i,j).alignment=Alignment(horizontal="left" if j==2 else "center",wrap_text=True)
+
+    # 全局底色与字体
+    for ws in wb.worksheets:
+        max_row=max(ws.max_row,60); max_col=max(ws.max_column,12)
+        for row in ws.iter_rows(min_row=1,max_row=max_row,min_col=1,max_col=max_col):
+            for c in row:
+                if c.fill.fill_type is None: c.fill=PatternFill("solid",fgColor=bg)
+                if c.value is not None and c.font.color is None: c.font=Font(name="Arial",size=10,color=text)
+        ws.sheet_view.zoomScale=90
+    out=BytesIO(); wb.save(out); out.seek(0)
+    safe_name=re.sub(r'[\\/:*?"<>|]','_',data.get("name",code))
+    return out.getvalue(), f"{safe_name}_{code}_财务分析_{datetime.now():%Y%m%d}.xlsx"
 
 
 def search_stocks(query):
@@ -726,6 +1062,16 @@ class Handler(BaseHTTPRequestHandler):
             elif path.startswith("/api/company-profile/"):
                 code = path.rsplit("/", 1)[-1]; force = urllib.parse.parse_qs(p.query).get("refresh") == ["1"]
                 self.send_json(get_company_profile(code, force))
+            elif path.startswith("/api/export/"):
+                code = path.rsplit("/", 1)[-1]
+                if not valid_code(code): raise ValueError("无效的A股代码")
+                content, filename = generate_excel_export(code)
+                encoded = urllib.parse.quote(filename)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                self.send_header("Content-Disposition", f"attachment; filename*=UTF-8''{encoded}")
+                self.send_header("Content-Length", str(len(content)))
+                self.end_headers(); self.wfile.write(content)
             elif path == "/api/favorites":
                 with DB_LOCK, db_conn() as con:
                     rows = con.execute("SELECT f.code,COALESCE(s.name,f.code) name FROM favorites f LEFT JOIN stocks s ON s.code=f.code ORDER BY f.created_at DESC").fetchall()
