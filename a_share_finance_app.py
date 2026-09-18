@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """A股30年核心财务指标本地看板。
 
 启动：python a_share_finance_app.py
-访问：http://127.0.0.1:8765
+访问：本机 http://127.0.0.1:8765；局域网 http://<本机局域网IP>:8765
 数据：同花顺F10公开页面；缓存：同目录下 a_share_finance.db（SQLite）。
 """
 from __future__ import annotations
@@ -23,7 +24,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO
 from pathlib import Path
 
-HOST = "127.0.0.1"
+HOST = "0.0.0.0"
 DEFAULT_PORT = 8765
 APP_DIR = Path(__file__).resolve().parent
 DB_PATH = APP_DIR / "a_share_finance.db"
